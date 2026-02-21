@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pontos de Ônibus SP</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="lib/leaflet.css" />
+  <script src="lib/leaflet.js"></script>
+
+  <!-- JSZip (GTFS zip parsing) -->
+  <script src="lib/jszip.min.js"></script>
+
+  <!-- PapaParse (CSV parsing) -->
+  <script src="lib/papaparse.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Fullscreen map -->
+  <div id="map"></div>
+
+  <!-- Upload panel (shown first) -->
+  <div id="upload-panel">
+    <div class="upload-card">
+      <h1>🚌 Pontos de Ônibus SP</h1>
+      <p>
+        Visualize os pontos de ônibus ao seu redor e acesse-os rapidamente no Olho Vivo.
+        Carregue o arquivo GTFS da SPTrans para começar.
+      </p>
+
+      <div class="upload-drop-zone" id="drop-zone">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        </svg>
+        <div class="drop-label">Arraste o arquivo GTFS aqui</div>
+        <div class="drop-hint">ou clique para selecionar</div>
+      </div>
+      <input type="file" id="file-input" accept=".zip" />
+
+      <button class="btn-primary" id="btn-choose-file">Selecionar arquivo .zip</button>
+
+      <p class="upload-info">
+        Obtenha o GTFS em
+        <a href="https://www.sptrans.com.br/desenvolvedor/" target="_blank" rel="noopener noreferrer">
+          sptrans.com.br/desenvolvedor
+        </a>
+      </p>
+    </div>
+  </div>
+
+  <!-- Top bar (shown after GTFS is loaded) -->
+  <div id="top-bar" class="hidden">
+    <span id="stops-count">–</span>
+    <button class="btn-icon" id="btn-locate">📍 Minha localização</button>
+    <button class="btn-icon secondary" id="btn-reload">↺ Trocar arquivo</button>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay" class="hidden">
+    <div class="loading-spinner"></div>
+    <p>Carregando…</p>
+  </div>
+
+  <!-- Error toast -->
+  <div id="error-toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
