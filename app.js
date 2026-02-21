@@ -1,4 +1,4 @@
-/* global L, JSZip, Papa */
+/* global L, Papa */
 
 const OLHOVIVO_URL = 'https://olhovivo.sptrans.com.br/#sp?cat=Parada&PID=';
 const MAX_STOPS_RADIUS_KM = 1.5;
@@ -6,6 +6,7 @@ const MAX_MARKERS = 200;
 const EARTH_RADIUS_KM = 6371;
 const DEFAULT_CENTER = [-23.5505, -46.6333];
 const DEFAULT_ZOOM = 14;
+const STOPS_DATA_URL = 'data/stops.txt';
 
 let map;
 let userMarker;
@@ -129,7 +130,7 @@ function renderNearbyStops() {
 
   if (allStops.length === 0) return;
 
-  let filtered = allStops;
+  let filtered;
 
   if (userLatLng) {
     filtered = allStops
@@ -169,131 +170,62 @@ function renderNearbyStops() {
       : `${count} paradas visíveis`;
 }
 
-// ─── GTFS Parsing ─────────────────────────────────────────────────────────────
+// ─── Stops Data Loading ───────────────────────────────────────────────────────
 
-async function loadGTFSZip(file) {
-  setLoading(true, 'Abrindo arquivo GTFS…');
+async function loadStopsCSV() {
+  setLoading(true, 'Carregando paradas…');
   try {
-    const zip = await JSZip.loadAsync(file);
-
-    // Find stops.txt (may be inside a folder)
-    let stopsFile = null;
-    zip.forEach((relativePath, zipEntry) => {
-      if (!zipEntry.dir && relativePath.match(/(^|\/)stops\.txt$/i)) {
-        stopsFile = zipEntry;
-      }
-    });
-
-    if (!stopsFile) {
-      setLoading(false);
-      showError('Arquivo stops.txt não encontrado no ZIP.');
-      return;
+    const response = await fetch(STOPS_DATA_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
+    const csvText = await response.text();
 
-    setLoading(true, 'Lendo stops.txt…');
-    const csvText = await stopsFile.async('text');
-
-    setLoading(true, 'Processando paradas…');
     const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-
     const rows = parsed.data;
+
     if (!rows.length) {
-      setLoading(false);
-      showError('Nenhuma parada encontrada em stops.txt.');
-      return;
+      throw new Error('Nenhuma parada encontrada em stops.txt.');
     }
 
     // Standard GTFS column names (spec: stop_id, stop_name, stop_lat, stop_lon)
     const sample = rows[0];
-    const idCol = 'stop_id';
-    const nameCol = 'stop_name';
-    const latCol = 'stop_lat';
-    const lonCol = 'stop_lon';
-
-    if (!sample[idCol] || sample[latCol] === undefined) {
-      setLoading(false);
-      showError('Formato de stops.txt inválido.');
-      return;
+    if (!sample['stop_id'] || sample['stop_lat'] === undefined) {
+      throw new Error('Formato de stops.txt inválido.');
     }
 
     allStops = rows
       .map((r) => ({
-        id: String(r[idCol]).trim(),
-        name: String(r[nameCol] || '').trim() || `Parada ${r[idCol]}`,
-        lat: parseFloat(r[latCol]),
-        lon: parseFloat(r[lonCol]),
+        id: String(r['stop_id']).trim(),
+        name: String(r['stop_name'] || '').trim() || `Parada ${r['stop_id']}`,
+        lat: parseFloat(r['stop_lat']),
+        lon: parseFloat(r['stop_lon']),
       }))
       .filter((s) => !isNaN(s.lat) && !isNaN(s.lon));
 
     setLoading(false);
-
-    // Hide upload panel, show map controls
-    document.getElementById('upload-panel').classList.add('hidden');
-    document.getElementById('top-bar').classList.remove('hidden');
-
     document.getElementById('stops-count').textContent =
       `${allStops.length} paradas carregadas`;
 
-    // Try to locate user right away
     locateUser();
   } catch (err) {
     setLoading(false);
-    showError(`Erro ao ler o arquivo: ${err.message}`);
+    showError(`Erro ao carregar paradas: ${err.message}`);
   }
-}
-
-// ─── Event Wiring ─────────────────────────────────────────────────────────────
-
-function setupUploadZone() {
-  const fileInput = document.getElementById('file-input');
-  const dropZone = document.getElementById('drop-zone');
-  const btnChoose = document.getElementById('btn-choose-file');
-
-  btnChoose.addEventListener('click', () => fileInput.click());
-  dropZone.addEventListener('click', () => fileInput.click());
-
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files[0]) loadGTFSZip(e.target.files[0]);
-  });
-
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('drag-over');
-  });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.zip')) {
-      loadGTFSZip(file);
-    } else {
-      showError('Por favor, selecione um arquivo .zip do GTFS.');
-    }
-  });
-}
-
-function setupTopBar() {
-  document.getElementById('btn-locate').addEventListener('click', locateUser);
-  document.getElementById('btn-reload').addEventListener('click', () => {
-    allStops = [];
-    stopsLayer.clearLayers();
-    document.getElementById('upload-panel').classList.remove('hidden');
-    document.getElementById('top-bar').classList.add('hidden');
-  });
-
-  // Re-render stops when map moves (if no user location)
-  map.on('moveend', () => {
-    if (!userLatLng) renderNearbyStops();
-  });
 }
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
-  setupUploadZone();
-  setupTopBar();
-  // Hide loading overlay immediately (it only shows during async ops)
-  setLoading(false);
+
+  document.getElementById('btn-locate').addEventListener('click', locateUser);
+
+  // Re-render stops when map moves (if no user location)
+  map.on('moveend', () => {
+    if (!userLatLng) renderNearbyStops();
+  });
+
+  loadStopsCSV();
 });
+
