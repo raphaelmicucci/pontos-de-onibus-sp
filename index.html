@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pontos de Ônibus SP</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="lib/leaflet.css" />
+  <script src="lib/leaflet.js"></script>
+
+  <!-- PapaParse (CSV parsing) -->
+  <script src="lib/papaparse.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Fullscreen map -->
+  <div id="map"></div>
+
+  <!-- Top bar -->
+  <div id="top-bar">
+    <span id="stops-count">–</span>
+    <button class="btn-icon" id="btn-locate">📍 Minha localização</button>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay" class="hidden">
+    <div class="loading-spinner"></div>
+    <p>Carregando…</p>
+  </div>
+
+  <!-- Error toast -->
+  <div id="error-toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
