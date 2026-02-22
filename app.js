@@ -1,9 +1,7 @@
 /* global L, Papa */
 
 const OLHOVIVO_URL = 'https://olhovivo.sptrans.com.br/#sp?cat=Parada&PID=';
-const MAX_STOPS_RADIUS_KM = 1.5;
 const MAX_MARKERS = 200;
-const EARTH_RADIUS_KM = 6371;
 const DEFAULT_CENTER = [-23.5505, -46.6333];
 const DEFAULT_ZOOM = 14;
 const STOPS_DATA_URL = 'data/stops.txt';
@@ -12,21 +10,9 @@ let map;
 let userMarker;
 let stopsLayer;
 let allStops = [];
-let userLatLng = null;
 let stopIcon;
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
-
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function showError(msg) {
   const toast = document.getElementById('error-toast');
@@ -93,10 +79,10 @@ function locateUser() {
     (pos) => {
       setLoading(false);
       const { latitude, longitude } = pos.coords;
-      userLatLng = L.latLng(latitude, longitude);
+      const latLng = L.latLng(latitude, longitude);
 
       if (userMarker) {
-        userMarker.setLatLng(userLatLng);
+        userMarker.setLatLng(latLng);
       } else {
         const icon = L.divIcon({
           className: '',
@@ -104,11 +90,11 @@ function locateUser() {
           iconSize: [16, 16],
           iconAnchor: [8, 8],
         });
-        userMarker = L.marker(userLatLng, { icon, zIndexOffset: 1000 }).addTo(map);
+        userMarker = L.marker(latLng, { icon, zIndexOffset: 1000 }).addTo(map);
         userMarker.bindPopup('<b>Você está aqui</b>').openPopup();
       }
 
-      map.setView(userLatLng, 16);
+      map.setView(latLng, 16);
       renderNearbyStops();
     },
     (err) => {
@@ -130,24 +116,11 @@ function renderNearbyStops() {
 
   if (allStops.length === 0) return;
 
-  let filtered;
-
-  if (userLatLng) {
-    filtered = allStops
-      .map((s) => ({
-        ...s,
-        dist: haversineKm(userLatLng.lat, userLatLng.lng, s.lat, s.lon),
-      }))
-      .filter((s) => s.dist <= MAX_STOPS_RADIUS_KM)
-      .sort((a, b) => a.dist - b.dist)
-      .slice(0, MAX_MARKERS);
-  } else {
-    // No user location: show stops in current map bounds (up to MAX_MARKERS)
-    const bounds = map.getBounds();
-    filtered = allStops
-      .filter((s) => bounds.contains([s.lat, s.lon]))
-      .slice(0, MAX_MARKERS);
-  }
+  // Always show stops in current map bounds (up to MAX_MARKERS)
+  const bounds = map.getBounds();
+  const filtered = allStops
+    .filter((s) => bounds.contains([s.lat, s.lon]))
+    .slice(0, MAX_MARKERS);
 
   filtered.forEach((stop) => {
     const marker = L.marker([stop.lat, stop.lon], { icon: stopIcon });
@@ -164,10 +137,7 @@ function renderNearbyStops() {
   });
 
   const count = stopsLayer.getLayers().length;
-  document.getElementById('stops-count').textContent =
-    userLatLng
-      ? `${count} paradas em ${MAX_STOPS_RADIUS_KM} km`
-      : `${count} paradas visíveis`;
+  document.getElementById('stops-count').textContent = `${count} paradas visíveis`;
 }
 
 // ─── Stops Data Loading ───────────────────────────────────────────────────────
@@ -221,10 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-locate').addEventListener('click', locateUser);
 
-  // Re-render stops when map moves (if no user location)
-  map.on('moveend', () => {
-    if (!userLatLng) renderNearbyStops();
-  });
+  // Re-render stops whenever the map moves
+  map.on('moveend', renderNearbyStops);
 
   loadStopsCSV();
 });
