@@ -5,6 +5,8 @@ const MAX_MARKERS = 200;
 const DEFAULT_CENTER = [-23.5505, -46.6333];
 const DEFAULT_ZOOM = 14;
 const STOPS_DATA_URL = 'data/stops.txt';
+const INITIAL_RADIUS_KM = 5;
+const LOAD_BUTTON_RADIUS_KM = 3;
 
 let map;
 let userMarker;
@@ -13,6 +15,17 @@ let allStops = [];
 let stopIcon;
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
+
+function distanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function showError(msg) {
   const toast = document.getElementById('error-toast');
@@ -95,7 +108,7 @@ function locateUser() {
       }
 
       map.setView(latLng, 16);
-      renderNearbyStops();
+      renderStopsNearCenter(INITIAL_RADIUS_KM);
     },
     (err) => {
       setLoading(false);
@@ -111,33 +124,66 @@ function locateUser() {
 
 // ─── Stops Rendering ─────────────────────────────────────────────────────────
 
+function buildMarker(stop) {
+  const marker = L.marker([stop.lat, stop.lon], { icon: stopIcon });
+  const popup = `
+    <div class="stop-popup">
+      <div class="stop-name">${escapeHtml(stop.name)}</div>
+      <div class="stop-id">ID: ${escapeHtml(stop.id)}</div>
+      <a class="olhovivo-link" href="${OLHOVIVO_URL}${encodeURIComponent(stop.id)}" target="_blank" rel="noopener noreferrer">
+        abrir no olho vivo
+      </a>
+    </div>`;
+  marker.bindPopup(popup, { maxWidth: 280 });
+  return marker;
+}
+
+function updateLoadButton() {
+  const btn = document.getElementById('btn-load-stops');
+  if (btn) {
+    btn.style.display = stopsLayer.getLayers().length === 0 ? '' : 'none';
+  }
+}
+
 function renderNearbyStops() {
   stopsLayer.clearLayers();
 
-  if (allStops.length === 0) return;
+  if (allStops.length === 0) {
+    updateLoadButton();
+    return;
+  }
 
-  // Always show stops in current map bounds (up to MAX_MARKERS)
+  // Show stops in current map bounds (up to MAX_MARKERS)
   const bounds = map.getBounds();
   const filtered = allStops
     .filter((s) => bounds.contains([s.lat, s.lon]))
     .slice(0, MAX_MARKERS);
 
-  filtered.forEach((stop) => {
-    const marker = L.marker([stop.lat, stop.lon], { icon: stopIcon });
-    const popup = `
-      <div class="stop-popup">
-        <div class="stop-name">${escapeHtml(stop.name)}</div>
-        <div class="stop-id">ID: ${escapeHtml(stop.id)}</div>
-        <a class="olhovivo-link" href="${OLHOVIVO_URL}${encodeURIComponent(stop.id)}" target="_blank" rel="noopener noreferrer">
-          abrir no olho vivo
-        </a>
-      </div>`;
-    marker.bindPopup(popup, { maxWidth: 280 });
-    stopsLayer.addLayer(marker);
-  });
+  filtered.forEach((stop) => stopsLayer.addLayer(buildMarker(stop)));
 
   const count = stopsLayer.getLayers().length;
   document.getElementById('stops-count').textContent = `${count} paradas visíveis`;
+  updateLoadButton();
+}
+
+function renderStopsNearCenter(radiusKm) {
+  stopsLayer.clearLayers();
+
+  if (allStops.length === 0) {
+    updateLoadButton();
+    return;
+  }
+
+  const center = map.getCenter();
+  const filtered = allStops
+    .filter((s) => distanceKm(center.lat, center.lng, s.lat, s.lon) <= radiusKm)
+    .slice(0, MAX_MARKERS);
+
+  filtered.forEach((stop) => stopsLayer.addLayer(buildMarker(stop)));
+
+  const count = stopsLayer.getLayers().length;
+  document.getElementById('stops-count').textContent = `${count} paradas visíveis`;
+  updateLoadButton();
 }
 
 // ─── Stops Data Loading ───────────────────────────────────────────────────────
@@ -190,6 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap();
 
   document.getElementById('btn-locate').addEventListener('click', locateUser);
+  document.getElementById('btn-load-stops').addEventListener('click', () => {
+    renderStopsNearCenter(LOAD_BUTTON_RADIUS_KM);
+  });
 
   // Re-render stops whenever the map moves
   map.on('moveend', renderNearbyStops);

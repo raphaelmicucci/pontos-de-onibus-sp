@@ -96,6 +96,14 @@ html, body {
   background: #0D47A1;
 }
 
+.btn-icon.btn-load {
+  background: #2E7D32;
+}
+
+.btn-icon.btn-load:hover {
+  background: #1B5E20;
+}
+
 /* Leaflet popup customization */
 .leaflet-popup-content-wrapper {
   border-radius: 12px !important;
