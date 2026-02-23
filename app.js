@@ -104,11 +104,12 @@ function locateUser() {
           iconAnchor: [8, 8],
         });
         userMarker = L.marker(latLng, { icon, zIndexOffset: 1000 }).addTo(map);
-        userMarker.bindPopup('<b>Você está aqui</b>').openPopup();
+        userMarker.bindPopup('<div style="padding:8px 10px"><b>Você está aqui</b></div>').openPopup();
       }
 
       map.setView(latLng, 16);
-      renderStopsNearCenter(INITIAL_RADIUS_KM);
+      map.invalidateSize();
+      renderNearbyStops();
     },
     (err) => {
       setLoading(false);
